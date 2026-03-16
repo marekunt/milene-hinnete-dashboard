@@ -11,7 +11,13 @@ export default async function DashboardPage() {
   const role = userEmail === process.env.ALLOWED_EMAIL_PARENT ? 'parent' : 'milene'
   const userInitials = userEmail.charAt(0).toUpperCase()
 
-  const supabase = createServiceClient()
+  let supabase: ReturnType<typeof createServiceClient>
+  try {
+    supabase = createServiceClient()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return <pre className="p-4 text-red-600 text-xs">createServiceClient error: {msg}</pre>
+  }
 
   // Fetch grades
   const { data: gradesData, error: gradesError } = await supabase
@@ -19,13 +25,19 @@ export default async function DashboardPage() {
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (gradesError) throw new Error(gradesError.message)
+  if (gradesError) {
+    return <pre className="p-4 text-red-600 text-xs">gradesError: {gradesError.message} | code: {gradesError.code}</pre>
+  }
 
   // Fetch all grade statuses (ordered descending so first per grade = latest)
-  const { data: statusData } = await supabase
+  const { data: statusData, error: statusError } = await supabase
     .from('grade_status')
     .select('*')
     .order('created_at', { ascending: false })
+
+  if (statusError) {
+    return <pre className="p-4 text-red-600 text-xs">statusError: {statusError.message} | code: {statusError.code}</pre>
+  }
 
   // Build map: grade_id -> latest status entry
   type StatusRow = NonNullable<typeof statusData>[0]
