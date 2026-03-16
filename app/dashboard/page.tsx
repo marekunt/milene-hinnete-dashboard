@@ -11,12 +11,21 @@ export default async function DashboardPage() {
   const role = userEmail === process.env.ALLOWED_EMAIL_PARENT ? 'parent' : 'milene'
   const userInitials = userEmail.charAt(0).toUpperCase()
 
+  const debugUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const debugKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
   let supabase: ReturnType<typeof createServiceClient>
   try {
     supabase = createServiceClient()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return <pre className="p-4 text-red-600 text-xs">createServiceClient error: {msg}</pre>
+    return (
+      <pre className="p-4 text-red-600 text-xs">
+        createServiceClient error: {msg}{'\n'}
+        URL defined: {String(!!debugUrl)} value: {debugUrl?.slice(0, 30) ?? 'UNDEFINED'}{'\n'}
+        KEY defined: {String(!!debugKey)} first10: {debugKey?.slice(0, 10) ?? 'UNDEFINED'}
+      </pre>
+    )
   }
 
   // Fetch grades
