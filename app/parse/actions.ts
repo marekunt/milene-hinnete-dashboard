@@ -8,8 +8,9 @@ export async function parseEmail(text: string): Promise<{ result?: ParsedGrade |
     const result = await parseEmailWithClaude(text)
     return { result }
   } catch (err) {
-    console.error('Parse error:', err)
-    return { error: 'Parsimine ebaõnnestus. Kontrolli teksti ja proovi uuesti.' }
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Parse error:', msg)
+    return { error: `Parsimine ebaõnnestus: ${msg}` }
   }
 }
 
