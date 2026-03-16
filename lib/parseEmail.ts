@@ -31,7 +31,7 @@ export async function parseEmailWithClaude(text: string): Promise<ParsedGrade | 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: text }],
