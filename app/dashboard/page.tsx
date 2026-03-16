@@ -1,29 +1,17 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createServiceClient } from '@/lib/supabase/server'
 import { GradeWithStatus } from '@/types'
 import DashboardClient from './components/DashboardClient'
 
 export default async function DashboardPage() {
-  const supabase = createServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) redirect('/login')
-
-  const userEmail = session.user.email ?? ''
-  const allowedEmails = [
-    process.env.ALLOWED_EMAIL_PARENT,
-    process.env.ALLOWED_EMAIL_STUDENT,
-  ].filter(Boolean)
-
-  if (!allowedEmails.includes(userEmail)) {
-    await supabase.auth.signOut()
-    redirect('/login')
-  }
+  const userEmail = cookies().get('mh-auth')?.value
+  if (!userEmail) redirect('/login')
 
   const role = userEmail === process.env.ALLOWED_EMAIL_PARENT ? 'parent' : 'milene'
   const userInitials = userEmail.charAt(0).toUpperCase()
+
+  const supabase = createServiceClient()
 
   // Fetch grades
   const { data: gradesData, error: gradesError } = await supabase

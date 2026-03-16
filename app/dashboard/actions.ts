@@ -1,11 +1,13 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { GradeStatus } from '@/types'
 
 export async function markDone(gradeId: string, updatedBy: string) {
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
   const { error } = await supabase.from('grade_status').insert({
     grade_id: gradeId,
     status: 'done' as GradeStatus,
@@ -23,7 +25,7 @@ export async function addNote(
   updatedBy: string,
   currentStatus: GradeStatus
 ) {
-  const supabase = createServerClient()
+  const supabase = createServiceClient()
   const { error } = await supabase.from('grade_status').insert({
     grade_id: gradeId,
     status: currentStatus,
@@ -36,7 +38,6 @@ export async function addNote(
 }
 
 export async function signOut() {
-  const supabase = createServerClient()
-  await supabase.auth.signOut()
-  revalidatePath('/', 'layout')
+  cookies().delete('mh-auth')
+  redirect('/login')
 }

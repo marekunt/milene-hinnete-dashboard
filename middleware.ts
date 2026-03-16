@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
-
-  // Check for Supabase auth cookie (project ref: nulbcmixjewxklarvndp)
-  const hasSession =
-    request.cookies.has('sb-nulbcmixjewxklarvndp-auth-token') ||
-    request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+  const hasSession = request.cookies.has('mh-auth')
 
   if (!hasSession && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))

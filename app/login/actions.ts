@@ -1,9 +1,11 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
-export async function signIn(email: string): Promise<{ ok?: boolean; error?: string }> {
+const APP_PASSWORD = process.env.APP_PASSWORD || 'Findus123'
+
+export async function signIn(email: string, password: string): Promise<{ error?: string }> {
   const allowedEmails = [
     process.env.ALLOWED_EMAIL_PARENT,
     process.env.ALLOWED_EMAIL_STUDENT,
@@ -13,18 +15,17 @@ export async function signIn(email: string): Promise<{ ok?: boolean; error?: str
     return { error: 'See email ei ole lubatud.' }
   }
 
-  const headersList = headers()
-  const origin = headersList.get('origin') || headersList.get('host') || 'http://localhost:3000'
-  const siteUrl = origin.startsWith('http') ? origin : `https://${origin}`
+  if (password !== APP_PASSWORD) {
+    return { error: 'Vale parool.' }
+  }
 
-  const supabase = createServerClient()
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
-    },
+  cookies().set('mh-auth', email, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+    path: '/',
   })
 
-  if (error) return { error: error.message }
-  return { ok: true }
+  redirect('/dashboard')
 }
