@@ -6,15 +6,6 @@ import { redirect } from 'next/navigation'
 const APP_PASSWORD = process.env.APP_PASSWORD || 'Findus123'
 
 export async function signIn(email: string, password: string): Promise<{ error?: string }> {
-  const allowedEmails = [
-    process.env.ALLOWED_EMAIL_PARENT,
-    process.env.ALLOWED_EMAIL_STUDENT,
-  ].filter(Boolean)
-
-  if (!allowedEmails.includes(email)) {
-    return { error: 'See email ei ole lubatud.' }
-  }
-
   if (password !== APP_PASSWORD) {
     return { error: 'Vale parool.' }
   }
