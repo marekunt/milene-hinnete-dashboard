@@ -16,6 +16,7 @@ interface GradeCardProps {
   onMarkDone: () => void
   onAddNote: () => void
   isPending?: boolean
+  hideSubject?: boolean
 }
 
 export default function GradeCard({
@@ -25,6 +26,7 @@ export default function GradeCard({
   onMarkDone,
   onAddNote,
   isPending = false,
+  hideSubject = false,
 }: GradeCardProps) {
   const deadlineStatus = getDeadlineStatus(grade.deadline, grade.status)
   const borderClass = getBorderClass(deadlineStatus)
@@ -40,20 +42,20 @@ export default function GradeCard({
       {/* Card header — always visible, tappable */}
       <button
         onClick={onToggle}
-        className="w-full text-left px-4 py-3 min-h-[56px] flex items-start gap-3 active:bg-gray-50"
+        className="w-full text-left px-4 py-3 min-h-[56px] flex items-start gap-3 active:bg-gray-50 hover:bg-gray-50 transition-colors"
         aria-expanded={isExpanded}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {/* Subject label */}
-            <span className="text-[10px] font-semibold tracking-widest uppercase text-gray-400">
-              {grade.subject}
-            </span>
+            {/* Subject label — hidden when inside a grouped section */}
+            {!hideSubject && (
+              <span className="text-[10px] font-semibold tracking-widest uppercase text-gray-400">
+                {grade.subject}
+              </span>
+            )}
 
-            {/* Grade badge */}
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeClass}`}
-            >
+            {/* Grade badge — larger and bolder */}
+            <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${badgeClass}`}>
               {isDone ? '✓' : grade.grade}
             </span>
 
@@ -62,14 +64,17 @@ export default function GradeCard({
             )}
           </div>
 
-          {/* Description (truncated when collapsed) */}
-          <p
-            className={`text-sm text-gray-700 ${
-              isExpanded ? '' : 'line-clamp-2'
-            }`}
-          >
-            {grade.description}
-          </p>
+          {/* Description — gradient fade when collapsed */}
+          {isExpanded ? (
+            <p className="text-sm text-gray-700">{grade.description}</p>
+          ) : (
+            <div className="relative">
+              <p className="text-sm text-gray-700 line-clamp-2">{grade.description}</p>
+              {grade.description && grade.description.length > 80 && (
+                <span className="text-xs text-gray-400 mt-0.5 block">Loe rohkem ›</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Expand chevron */}
@@ -137,7 +142,7 @@ export default function GradeCard({
               <button
                 onClick={onMarkDone}
                 disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-50 text-green-700 rounded-xl text-sm font-medium active:bg-green-100 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold active:bg-green-700 disabled:opacity-50 transition-colors"
               >
                 <span>✓</span>
                 <span>Märgi tehtud</span>
@@ -145,7 +150,7 @@ export default function GradeCard({
               <button
                 onClick={onAddNote}
                 disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-200 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-200 disabled:opacity-50 transition-colors"
               >
                 <span>💬</span>
                 <span>Lisa märkus</span>

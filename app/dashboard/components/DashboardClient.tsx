@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useOptimistic } from 'react'
+import { useRouter } from 'next/navigation'
 import { GradeWithStatus, UserRole } from '@/types'
 import { markDone, addNote, signOut } from '../actions'
 import { getDeadlineStatus } from '@/lib/gradeUtils'
@@ -22,8 +23,8 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   const [bottomSheetGradeId, setBottomSheetGradeId] = useState<string | null>(null)
   const [doneExpanded, setDoneExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
-  // Optimistic updates: track grade IDs that are being marked done
   const [optimisticGrades, addOptimistic] = useOptimistic(
     grades,
     (
@@ -73,6 +74,11 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   const activeGrades = optimisticGrades.filter((g) => g.status !== 'done')
   const doneGrades = optimisticGrades.filter((g) => g.status === 'done')
 
+  const urgentCount = activeGrades.filter((g) => {
+    const ds = getDeadlineStatus(g.deadline, g.status)
+    return ds === 'urgent' || ds === 'soon'
+  }).length
+
   let displayedGrades: GradeWithStatus[]
   if (activeFilter === 'done') {
     displayedGrades = doneGrades
@@ -105,21 +111,38 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   }, {})
 
   const bottomSheetGrade = optimisticGrades.find((g) => g.id === bottomSheetGradeId)
+  const greetingName = role === 'parent' ? 'Marek' : 'Milene'
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-base font-bold">Milene hinded</h1>
-          <button
-            onClick={handleSignOut}
-            className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold flex items-center justify-center active:bg-blue-700"
-            title="Logi välja"
-            aria-label="Logi välja"
-          >
-            {userInitials}
-          </button>
+          <div>
+            <h1 className="text-base font-bold leading-tight">Milene hinded</h1>
+            <p className="text-xs text-gray-400 leading-tight">
+              Tere, {greetingName}! · {activeGrades.length} avatud
+              {urgentCount > 0 && ` · ${urgentCount} tähtaeg`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/parse')}
+              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-lg font-light flex items-center justify-center active:bg-gray-200 hover:bg-gray-200 transition-colors"
+              title="Lisa käsitsi"
+              aria-label="Lisa käsitsi"
+            >
+              +
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold flex items-center justify-center active:bg-blue-700"
+              title="Logi välja"
+              aria-label="Logi välja"
+            >
+              {userInitials}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -132,15 +155,15 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
 
       {/* Filter tabs */}
       <div className="max-w-lg mx-auto px-4 mb-4">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        <div className="flex border-b border-gray-200">
           {(['all', 'deadline', 'done'] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
                 activeFilter === f
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               {f === 'all' ? 'Kõik' : f === 'deadline' ? 'Tähtaeg läheneb' : 'Tehtud'}
@@ -161,9 +184,9 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
             ) : (
               Object.entries(grouped).map(([subject, subjectGrades]) => (
                 <div key={subject} className="mb-5">
-                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">
+                  <h2 className="text-sm font-semibold text-gray-500 mb-2 px-1">
                     {subject}
-                    <span className="ml-1.5 text-gray-300">({subjectGrades.length})</span>
+                    <span className="ml-1.5 text-gray-400 font-normal">({subjectGrades.length})</span>
                   </h2>
                   <div className="space-y-2">
                     {subjectGrades.map((grade) => (
@@ -175,6 +198,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                         onMarkDone={() => handleMarkDone(grade.id)}
                         onAddNote={() => handleOpenNote(grade.id)}
                         isPending={isPending}
+                        hideSubject={true}
                       />
                     ))}
                   </div>
@@ -223,9 +247,12 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
         {activeFilter === 'done' && (
           <>
             {doneGrades.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <p className="text-2xl mb-2">📋</p>
-                <p className="text-sm">Tehtud ülesandeid pole veel.</p>
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">✓</span>
+                </div>
+                <p className="text-gray-700 font-medium mb-1">Pole veel midagi tehtud</p>
+                <p className="text-gray-400 text-sm">Märgi ülesanded tehtuks, kui need on lahendatud.</p>
               </div>
             ) : (
               <div className="space-y-2">
