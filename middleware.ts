@@ -1,45 +1,22 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  if (!session && pathname.startsWith('/dashboard')) {
+  // Check for Supabase auth cookie (project ref: nulbcmixjewxklarvndp)
+  const hasSession =
+    request.cookies.has('sb-nulbcmixjewxklarvndp-auth-token') ||
+    request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+
+  if (!hasSession && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session && pathname === '/login') {
+  if (hasSession && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {
