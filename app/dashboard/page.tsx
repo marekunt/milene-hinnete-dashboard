@@ -40,7 +40,8 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
 
   // Build map: grade_id -> latest status entry
-  const statusMap = new Map<string, (typeof statusData)[0]>()
+  type StatusRow = NonNullable<typeof statusData>[0]
+  const statusMap = new Map<string, StatusRow>()
   statusData?.forEach((s) => {
     if (!statusMap.has(s.grade_id)) {
       statusMap.set(s.grade_id, s)
