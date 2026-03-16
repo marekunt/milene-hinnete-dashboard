@@ -37,6 +37,8 @@ export async function parseEmailWithClaude(text: string): Promise<ParsedGrade | 
     messages: [{ role: 'user', content: text }],
   })
 
-  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
-  return JSON.parse(responseText)
+  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+  // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+  return JSON.parse(cleaned)
 }
