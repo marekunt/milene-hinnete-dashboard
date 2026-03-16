@@ -3,13 +3,14 @@
 import { useState, useTransition, useOptimistic } from 'react'
 import { useRouter } from 'next/navigation'
 import { GradeWithStatus, UserRole } from '@/types'
-import { markDone, addNote, signOut } from '../actions'
+import { markDone, addNote, deleteGrade, signOut } from '../actions'
 import { getDeadlineStatus } from '@/lib/gradeUtils'
 import GradeCard from './GradeCard'
 import BottomSheet from './BottomSheet'
 import SummaryPills from './SummaryPills'
 
 type FilterType = 'all' | 'deadline' | 'done'
+type SortType = 'deadline' | 'date'
 
 interface DashboardClientProps {
   grades: GradeWithStatus[]
@@ -19,6 +20,7 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ grades, role, userInitials }: DashboardClientProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
+  const [sortBy, setSortBy] = useState<SortType>('deadline')
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [bottomSheetGradeId, setBottomSheetGradeId] = useState<string | null>(null)
   const [doneExpanded, setDoneExpanded] = useState(false)
@@ -29,8 +31,11 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
     grades,
     (
       state: GradeWithStatus[],
-      update: { gradeId: string; patch: Partial<GradeWithStatus> }
-    ) => state.map((g) => (g.id === update.gradeId ? { ...g, ...update.patch } : g))
+      update: { type?: 'delete'; gradeId: string; patch?: Partial<GradeWithStatus> }
+    ) => {
+      if (update.type === 'delete') return state.filter((g) => g.id !== update.gradeId)
+      return state.map((g) => (g.id === update.gradeId ? { ...g, ...update.patch } : g))
+    }
   )
 
   function handleToggle(id: string) {
@@ -42,6 +47,14 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
       addOptimistic({ gradeId, patch: { status: 'done', resolved_at: new Date().toISOString(), updated_by: role } })
       setExpandedCardId(null)
       await markDone(gradeId, role)
+    })
+  }
+
+  function handleDelete(gradeId: string) {
+    startTransition(async () => {
+      addOptimistic({ type: 'delete', gradeId })
+      setExpandedCardId(null)
+      await deleteGrade(gradeId)
     })
   }
 
@@ -91,8 +104,14 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
     displayedGrades = activeGrades
   }
 
-  // Sort: urgent first, then by deadline asc, then by created_at desc
+  // Sort
   displayedGrades = [...displayedGrades].sort((a, b) => {
+    if (sortBy === 'date') {
+      const aDate = a.graded_at ?? a.created_at
+      const bDate = b.graded_at ?? b.created_at
+      return new Date(bDate).getTime() - new Date(aDate).getTime()
+    }
+    // Default: urgency → deadline asc → created_at desc
     const order = { urgent: 0, soon: 1, none: 2, done: 3 }
     const aStatus = getDeadlineStatus(a.deadline, a.status)
     const bStatus = getDeadlineStatus(b.deadline, b.status)
@@ -153,22 +172,38 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
         onFilterChange={setActiveFilter}
       />
 
-      {/* Filter tabs */}
+      {/* Filter tabs + sort toggle */}
       <div className="max-w-lg mx-auto px-4 mb-4">
-        <div className="flex border-b border-gray-200">
-          {(['all', 'deadline', 'done'] as FilterType[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeFilter === f
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {f === 'all' ? 'Kõik' : f === 'deadline' ? 'Tähtaeg läheneb' : 'Tehtud'}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 flex border-b border-gray-200">
+            {(['all', 'deadline', 'done'] as FilterType[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeFilter === f
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {f === 'all' ? 'Kõik' : f === 'deadline' ? 'Tähtaeg' : 'Tehtud'}
+              </button>
+            ))}
+          </div>
+          {/* Sort toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs shrink-0 mb-0.5">
+            {(['deadline', 'date'] as SortType[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSortBy(s)}
+                className={`px-2 py-1 rounded-md font-medium transition-colors ${
+                  sortBy === s ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                {s === 'deadline' ? 'Tähtaeg' : 'Kuupäev'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -197,6 +232,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                         onToggle={() => handleToggle(grade.id)}
                         onMarkDone={() => handleMarkDone(grade.id)}
                         onAddNote={() => handleOpenNote(grade.id)}
+                        onDelete={() => handleDelete(grade.id)}
                         isPending={isPending}
                         hideSubject={true}
                       />
@@ -234,6 +270,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                         onToggle={() => handleToggle(grade.id)}
                         onMarkDone={() => handleMarkDone(grade.id)}
                         onAddNote={() => handleOpenNote(grade.id)}
+                        onDelete={() => handleDelete(grade.id)}
                         isPending={isPending}
                       />
                     ))}
@@ -264,6 +301,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                     onToggle={() => handleToggle(grade.id)}
                     onMarkDone={() => handleMarkDone(grade.id)}
                     onAddNote={() => handleOpenNote(grade.id)}
+                    onDelete={() => handleDelete(grade.id)}
                     isPending={isPending}
                   />
                 ))}

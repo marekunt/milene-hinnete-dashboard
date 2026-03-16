@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { GradeWithStatus } from '@/types'
 import {
   getBorderClass,
@@ -15,6 +16,7 @@ interface GradeCardProps {
   onToggle: () => void
   onMarkDone: () => void
   onAddNote: () => void
+  onDelete?: () => void
   isPending?: boolean
   hideSubject?: boolean
 }
@@ -25,9 +27,11 @@ export default function GradeCard({
   onToggle,
   onMarkDone,
   onAddNote,
+  onDelete,
   isPending = false,
   hideSubject = false,
 }: GradeCardProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const deadlineStatus = getDeadlineStatus(grade.deadline, grade.status)
   const borderClass = getBorderClass(deadlineStatus)
   const badgeClass = getGradeBadgeClass(grade.grade, grade.status)
@@ -41,7 +45,7 @@ export default function GradeCard({
     >
       {/* Card header — always visible, tappable */}
       <button
-        onClick={onToggle}
+        onClick={() => { onToggle(); setConfirmingDelete(false) }}
         className="w-full text-left px-4 py-3 min-h-[56px] flex items-start gap-3 active:bg-gray-50 hover:bg-gray-50 transition-colors"
         aria-expanded={isExpanded}
       >
@@ -155,6 +159,29 @@ export default function GradeCard({
                 <span>💬</span>
                 <span>Lisa märkus</span>
               </button>
+            </div>
+          )}
+
+          {/* Delete button — two-tap confirm */}
+          {onDelete && (
+            <div className="pt-2">
+              {confirmingDelete ? (
+                <button
+                  onClick={onDelete}
+                  disabled={isPending}
+                  className="w-full py-2 bg-red-600 text-white rounded-xl text-sm font-semibold active:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  Kindel? Kustuta
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  disabled={isPending}
+                  className="w-full py-2 bg-red-50 text-red-500 rounded-xl text-sm font-medium active:bg-red-100 disabled:opacity-50 transition-colors"
+                >
+                  Kustuta
+                </button>
+              )}
             </div>
           )}
         </div>

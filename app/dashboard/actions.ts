@@ -37,6 +37,13 @@ export async function addNote(
   revalidatePath('/dashboard')
 }
 
+export async function deleteGrade(gradeId: string) {
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('grades').delete().eq('id', gradeId)
+  if (error) throw new Error(error.message)
+  revalidatePath('/dashboard')
+}
+
 export async function signOut() {
   cookies().delete('mh-auth')
   redirect('/login')
