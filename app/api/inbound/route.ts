@@ -30,8 +30,8 @@ function createServiceClient() {
 }
 
 export async function POST(request: NextRequest) {
-  // Validate webhook secret
-  const webhookSecret = request.headers.get('x-postmark-secret')
+  // Validate webhook secret (passed as query param ?secret=... since Postmark doesn't support custom headers)
+  const webhookSecret = request.nextUrl.searchParams.get('secret')
   if (
     process.env.POSTMARK_WEBHOOK_SECRET &&
     webhookSecret !== process.env.POSTMARK_WEBHOOK_SECRET
