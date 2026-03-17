@@ -181,7 +181,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
           <div>
             <h1 className="text-base font-bold leading-tight">Milene hinded</h1>
             <p className="text-xs text-gray-400 leading-tight">
-              Tere, {greetingName}! · {activeGrades.length} avatud
+              {activeGrades.length} avatud
               {urgentCount > 0 && ` · ${urgentCount} tähtaeg`}
             </p>
           </div>
