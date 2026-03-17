@@ -8,7 +8,8 @@ export default async function DashboardPage() {
   const userEmail = cookies().get('mh-auth')?.value
   if (!userEmail) redirect('/login')
 
-  const role = userEmail === process.env.ALLOWED_EMAIL_PARENT ? 'parent' : 'milene'
+  const parentEmails = (process.env.ALLOWED_EMAIL_PARENTS ?? process.env.ALLOWED_EMAIL_PARENT ?? '').split(',').map(e => e.trim())
+  const role = parentEmails.includes(userEmail) ? 'parent' : 'milene'
   const userInitials = userEmail.charAt(0).toUpperCase()
 
   const supabase = createServiceClient()
