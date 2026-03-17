@@ -16,6 +16,9 @@ interface GradeCardProps {
   onToggle: () => void
   onMarkDone: () => void
   onAddNote: () => void
+  onEdit?: () => void
+  onReopen?: () => void
+  onWontFix?: () => void
   onDelete?: () => void
   isPending?: boolean
   hideSubject?: boolean
@@ -27,6 +30,9 @@ export default function GradeCard({
   onToggle,
   onMarkDone,
   onAddNote,
+  onEdit,
+  onReopen,
+  onWontFix,
   onDelete,
   isPending = false,
   hideSubject = false,
@@ -36,14 +42,16 @@ export default function GradeCard({
   const borderClass = getBorderClass(deadlineStatus)
   const badgeClass = getGradeBadgeClass(grade.grade, grade.status)
   const isDone = grade.status === 'done'
+  const isWontFix = grade.status === 'wont_fix'
+  const isResolved = isDone || isWontFix
 
   return (
     <div
       className={`bg-white rounded-xl border-l-4 ${borderClass} shadow-sm overflow-hidden transition-opacity ${
-        isDone ? 'opacity-60' : ''
+        isResolved ? 'opacity-60' : ''
       }`}
     >
-      {/* Card header — always visible, tappable */}
+      {/* Card header */}
       <button
         onClick={() => { onToggle(); setConfirmingDelete(false) }}
         className="w-full text-left px-4 py-3 min-h-[56px] flex items-start gap-3 active:bg-gray-50 hover:bg-gray-50 transition-colors"
@@ -51,16 +59,14 @@ export default function GradeCard({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {/* Subject label — hidden when inside a grouped section */}
             {!hideSubject && (
               <span className="text-[10px] font-semibold tracking-widest uppercase text-gray-400">
                 {grade.subject}
               </span>
             )}
 
-            {/* Grade badge — larger and bolder */}
             <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${badgeClass}`}>
-              {isDone ? '✓' : grade.grade}
+              {isDone ? '✓' : isWontFix ? '—' : grade.grade}
             </span>
 
             {grade.grade_type && (
@@ -68,7 +74,6 @@ export default function GradeCard({
             )}
           </div>
 
-          {/* Description — gradient fade when collapsed */}
           {isExpanded ? (
             <p className="text-sm text-gray-700">{grade.description}</p>
           ) : (
@@ -81,7 +86,6 @@ export default function GradeCard({
           )}
         </div>
 
-        {/* Expand chevron */}
         <svg
           className={`w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5 transition-transform ${
             isExpanded ? 'rotate-180' : ''
@@ -132,37 +136,76 @@ export default function GradeCard({
             </div>
           )}
 
-          {/* Done info */}
-          {isDone && grade.resolved_at && (
-            <div className="text-xs text-green-600 mb-3">
-              Tehtud {formatRelativeTime(grade.resolved_at)}
+          {/* Resolved info */}
+          {isResolved && grade.resolved_at && (
+            <div className={`text-xs mb-3 ${isDone ? 'text-green-600' : 'text-gray-400'}`}>
+              {isDone ? 'Tehtud' : 'Vahele jäetud'} {formatRelativeTime(grade.resolved_at)}
               {grade.updated_by && ` · ${grade.updated_by === 'parent' ? 'Vanem' : 'Milene'}`}
             </div>
           )}
 
-          {/* Action bar (only for non-done cards) */}
-          {!isDone && (
-            <div className="flex gap-2 pt-1">
+          {/* Action bar — open grades */}
+          {!isResolved && (
+            <>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={onMarkDone}
+                  disabled={isPending}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold active:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  <span>✓</span>
+                  <span>Märgi tehtud</span>
+                </button>
+                <button
+                  onClick={onAddNote}
+                  disabled={isPending}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-200 disabled:opacity-50 transition-colors"
+                >
+                  <span>💬</span>
+                  <span>Lisa märkus</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 mt-2">
+                {onEdit && (
+                  <button
+                    onClick={onEdit}
+                    disabled={isPending}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-medium border border-gray-200 active:bg-gray-100 disabled:opacity-50 transition-colors"
+                  >
+                    <span>✏️</span>
+                    <span>Muuda</span>
+                  </button>
+                )}
+                {onWontFix && (
+                  <button
+                    onClick={onWontFix}
+                    disabled={isPending}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-50 text-gray-500 rounded-xl text-sm font-medium border border-gray-200 active:bg-gray-100 disabled:opacity-50 transition-colors"
+                  >
+                    <span>—</span>
+                    <span>Jätan vahele</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Action bar — resolved grades */}
+          {isResolved && onReopen && (
+            <div className="pt-1">
               <button
-                onClick={onMarkDone}
+                onClick={onReopen}
                 disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold active:bg-green-700 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-200 disabled:opacity-50 transition-colors"
               >
-                <span>✓</span>
-                <span>Märgi tehtud</span>
-              </button>
-              <button
-                onClick={onAddNote}
-                disabled={isPending}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium active:bg-gray-200 disabled:opacity-50 transition-colors"
-              >
-                <span>💬</span>
-                <span>Lisa märkus</span>
+                <span>↩</span>
+                <span>Ava uuesti</span>
               </button>
             </div>
           )}
 
-          {/* Delete button — two-tap confirm */}
+          {/* Delete */}
           {onDelete && (
             <div className="pt-2">
               {confirmingDelete ? (

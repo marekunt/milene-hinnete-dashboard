@@ -2,15 +2,17 @@
 
 import { useState, useTransition, useOptimistic } from 'react'
 import { useRouter } from 'next/navigation'
-import { GradeWithStatus, UserRole } from '@/types'
-import { markDone, addNote, deleteGrade, signOut } from '../actions'
+import { GradeWithStatus, Grade, UserRole } from '@/types'
+import { markDone, addNote, updateGrade, reopenGrade, markWontFix, deleteGrade, signOut } from '../actions'
 import { getDeadlineStatus } from '@/lib/gradeUtils'
 import GradeCard from './GradeCard'
 import BottomSheet from './BottomSheet'
+import EditSheet from './EditSheet'
 import SummaryPills from './SummaryPills'
 
 type FilterType = 'all' | 'deadline' | 'done'
 type SortType = 'deadline' | 'date'
+type GradePatch = Partial<Pick<Grade, 'grade' | 'grade_type' | 'graded_at' | 'deadline' | 'description'>>
 
 interface DashboardClientProps {
   grades: GradeWithStatus[]
@@ -23,6 +25,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   const [sortBy, setSortBy] = useState<SortType>('deadline')
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [bottomSheetGradeId, setBottomSheetGradeId] = useState<string | null>(null)
+  const [editSheetGradeId, setEditSheetGradeId] = useState<string | null>(null)
   const [doneExpanded, setDoneExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -31,7 +34,9 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
     grades,
     (
       state: GradeWithStatus[],
-      update: { type?: 'delete'; gradeId: string; patch?: Partial<GradeWithStatus> }
+      update:
+        | { type: 'delete'; gradeId: string }
+        | { type: 'patch'; gradeId: string; patch: Partial<GradeWithStatus> }
     ) => {
       if (update.type === 'delete') return state.filter((g) => g.id !== update.gradeId)
       return state.map((g) => (g.id === update.gradeId ? { ...g, ...update.patch } : g))
@@ -44,9 +49,25 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
 
   function handleMarkDone(gradeId: string) {
     startTransition(async () => {
-      addOptimistic({ gradeId, patch: { status: 'done', resolved_at: new Date().toISOString(), updated_by: role } })
+      addOptimistic({ type: 'patch', gradeId, patch: { status: 'done', resolved_at: new Date().toISOString(), updated_by: role } })
       setExpandedCardId(null)
       await markDone(gradeId, role)
+    })
+  }
+
+  function handleReopen(gradeId: string) {
+    startTransition(async () => {
+      addOptimistic({ type: 'patch', gradeId, patch: { status: 'open', resolved_at: null, updated_by: role } })
+      setExpandedCardId(null)
+      await reopenGrade(gradeId, role)
+    })
+  }
+
+  function handleWontFix(gradeId: string) {
+    startTransition(async () => {
+      addOptimistic({ type: 'patch', gradeId, patch: { status: 'wont_fix', resolved_at: new Date().toISOString(), updated_by: role } })
+      setExpandedCardId(null)
+      await markWontFix(gradeId, role)
     })
   }
 
@@ -72,9 +93,29 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
     if (!grade) return
 
     startTransition(async () => {
-      addOptimistic({ gradeId: bottomSheetGradeId, patch: { note, updated_by: role } })
+      addOptimistic({ type: 'patch', gradeId: bottomSheetGradeId, patch: { note, updated_by: role } })
       setBottomSheetGradeId(null)
       await addNote(bottomSheetGradeId, note, role, grade.status)
+    })
+  }
+
+  function handleOpenEdit(gradeId: string) {
+    setEditSheetGradeId(gradeId)
+  }
+
+  function handleCloseEdit() {
+    setEditSheetGradeId(null)
+  }
+
+  async function handleSaveEdit(patch: GradePatch) {
+    if (!editSheetGradeId || Object.keys(patch).length === 0) {
+      setEditSheetGradeId(null)
+      return
+    }
+    startTransition(async () => {
+      addOptimistic({ type: 'patch', gradeId: editSheetGradeId, patch })
+      setEditSheetGradeId(null)
+      await updateGrade(editSheetGradeId, patch)
     })
   }
 
@@ -84,8 +125,8 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   }
 
   // Filter logic
-  const activeGrades = optimisticGrades.filter((g) => g.status !== 'done')
-  const doneGrades = optimisticGrades.filter((g) => g.status === 'done')
+  const activeGrades = optimisticGrades.filter((g) => g.status !== 'done' && g.status !== 'wont_fix')
+  const resolvedGrades = optimisticGrades.filter((g) => g.status === 'done' || g.status === 'wont_fix')
 
   const urgentCount = activeGrades.filter((g) => {
     const ds = getDeadlineStatus(g.deadline, g.status)
@@ -94,7 +135,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
 
   let displayedGrades: GradeWithStatus[]
   if (activeFilter === 'done') {
-    displayedGrades = doneGrades
+    displayedGrades = resolvedGrades
   } else if (activeFilter === 'deadline') {
     displayedGrades = activeGrades.filter((g) => {
       const ds = getDeadlineStatus(g.deadline, g.status)
@@ -111,8 +152,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
       const bDate = b.graded_at ?? b.created_at
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     }
-    // Default: urgency → deadline asc → created_at desc
-    const order = { urgent: 0, soon: 1, none: 2, done: 3 }
+    const order: Record<string, number> = { urgent: 0, soon: 1, none: 2, done: 3, wont_fix: 4 }
     const aStatus = getDeadlineStatus(a.deadline, a.status)
     const bStatus = getDeadlineStatus(b.deadline, b.status)
     if (order[aStatus] !== order[bStatus]) return order[aStatus] - order[bStatus]
@@ -130,6 +170,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
   }, {})
 
   const bottomSheetGrade = optimisticGrades.find((g) => g.id === bottomSheetGradeId)
+  const editSheetGrade = optimisticGrades.find((g) => g.id === editSheetGradeId) ?? null
   const greetingName = role === 'parent' ? 'Marek' : 'Milene'
 
   return (
@@ -190,7 +231,6 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
               </button>
             ))}
           </div>
-          {/* Sort toggle */}
           <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs shrink-0 mb-0.5">
             {(['deadline', 'date'] as SortType[]).map((s) => (
               <button
@@ -232,6 +272,9 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                         onToggle={() => handleToggle(grade.id)}
                         onMarkDone={() => handleMarkDone(grade.id)}
                         onAddNote={() => handleOpenNote(grade.id)}
+                        onEdit={() => handleOpenEdit(grade.id)}
+                        onReopen={() => handleReopen(grade.id)}
+                        onWontFix={() => handleWontFix(grade.id)}
                         onDelete={() => handleDelete(grade.id)}
                         isPending={isPending}
                         hideSubject={true}
@@ -242,8 +285,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
               ))
             )}
 
-            {/* Done section (collapsible) */}
-            {activeFilter === 'all' && doneGrades.length > 0 && (
+            {activeFilter === 'all' && resolvedGrades.length > 0 && (
               <div className="mt-6 mb-4">
                 <button
                   onClick={() => setDoneExpanded((v) => !v)}
@@ -257,12 +299,12 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                  Tehtud ({doneGrades.length})
+                  Tehtud / vahele jäetud ({resolvedGrades.length})
                 </button>
 
                 {doneExpanded && (
                   <div className="space-y-2">
-                    {doneGrades.map((grade) => (
+                    {resolvedGrades.map((grade) => (
                       <GradeCard
                         key={grade.id}
                         grade={grade}
@@ -270,6 +312,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                         onToggle={() => handleToggle(grade.id)}
                         onMarkDone={() => handleMarkDone(grade.id)}
                         onAddNote={() => handleOpenNote(grade.id)}
+                        onReopen={() => handleReopen(grade.id)}
                         onDelete={() => handleDelete(grade.id)}
                         isPending={isPending}
                       />
@@ -283,7 +326,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
 
         {activeFilter === 'done' && (
           <>
-            {doneGrades.length === 0 ? (
+            {resolvedGrades.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">✓</span>
@@ -293,7 +336,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
               </div>
             ) : (
               <div className="space-y-2">
-                {doneGrades.map((grade) => (
+                {resolvedGrades.map((grade) => (
                   <GradeCard
                     key={grade.id}
                     grade={grade}
@@ -301,6 +344,7 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
                     onToggle={() => handleToggle(grade.id)}
                     onMarkDone={() => handleMarkDone(grade.id)}
                     onAddNote={() => handleOpenNote(grade.id)}
+                    onReopen={() => handleReopen(grade.id)}
                     onDelete={() => handleDelete(grade.id)}
                     isPending={isPending}
                   />
@@ -311,12 +355,19 @@ export default function DashboardClient({ grades, role, userInitials }: Dashboar
         )}
       </main>
 
-      {/* Note bottom sheet */}
       <BottomSheet
         isOpen={!!bottomSheetGradeId}
         onClose={handleCloseNote}
         onSave={handleSaveNote}
         title={bottomSheetGrade ? `Märkus: ${bottomSheetGrade.subject}` : 'Lisa märkus'}
+        isPending={isPending}
+      />
+
+      <EditSheet
+        isOpen={!!editSheetGradeId}
+        onClose={handleCloseEdit}
+        onSave={handleSaveEdit}
+        grade={editSheetGrade}
         isPending={isPending}
       />
     </div>

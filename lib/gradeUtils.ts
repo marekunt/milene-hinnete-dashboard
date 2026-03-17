@@ -1,10 +1,11 @@
-export type DeadlineStatus = 'urgent' | 'soon' | 'none' | 'done'
+export type DeadlineStatus = 'urgent' | 'soon' | 'none' | 'done' | 'wont_fix'
 
 export function getDeadlineStatus(
   deadline: string | null,
   status: string
 ): DeadlineStatus {
   if (status === 'done') return 'done'
+  if (status === 'wont_fix') return 'wont_fix'
   if (!deadline) return 'none'
 
   const today = new Date()
@@ -24,6 +25,8 @@ export function getBorderClass(deadlineStatus: DeadlineStatus): string {
   switch (deadlineStatus) {
     case 'done':
       return 'border-l-green-500'
+    case 'wont_fix':
+      return 'border-l-gray-400'
     case 'urgent':
       return 'border-l-[#E24B4A]'
     case 'soon':
@@ -35,6 +38,7 @@ export function getBorderClass(deadlineStatus: DeadlineStatus): string {
 
 export function getGradeBadgeClass(grade: string, status: string): string {
   if (status === 'done') return 'bg-green-100 text-green-800'
+  if (status === 'wont_fix') return 'bg-gray-100 text-gray-400 line-through'
 
   const g = grade.toLowerCase().trim()
 
